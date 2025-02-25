@@ -14,6 +14,10 @@ CORS(app)
 DOWNLOAD_DIR = Path("downloads")
 DOWNLOAD_DIR.mkdir(exist_ok=True)
 
+@app.route('/')
+def health_check():
+    return jsonify({"status": "healthy", "message": "Backend is running"}), 200
+
 def cleanup_old_files():
     """Remove files older than 24 hours"""
     now = datetime.now()

@@ -50,7 +50,7 @@ export function DownloadForm() {
       if (formData.directDownload) {
         // For direct downloads, get the download URL and trigger browser download
         const { download_url } = await response.json();
-        window.location.href = download_url;
+        window.location.href = `http://localhost:5000${download_url}`;
       } else {
         // For non-direct downloads, show success message with the video info
         const result = await response.json();
@@ -61,6 +61,7 @@ export function DownloadForm() {
         });
       }
     } catch (error) {
+      console.error('Download error:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to download video",
