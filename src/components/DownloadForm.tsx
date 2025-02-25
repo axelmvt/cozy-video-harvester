@@ -12,6 +12,9 @@ type DownloadFormData = {
   directDownload: boolean;
 };
 
+// Use a local API URL that will be proxied by Vite's dev server
+const API_BASE_URL = '/api';
+
 export function DownloadForm() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -26,8 +29,8 @@ export function DownloadForm() {
     setLoading(true);
 
     try {
-      console.log("Making request to:", `${import.meta.env.VITE_API_URL}/download`);
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/download`, {
+      console.log("Making request to:", `${API_BASE_URL}/download`);
+      const response = await fetch(`${API_BASE_URL}/download`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -56,7 +59,7 @@ export function DownloadForm() {
       if (formData.directDownload) {
         const { download_url } = await response.json();
         console.log("Direct download URL:", download_url);
-        window.location.href = `${import.meta.env.VITE_API_URL}${download_url}`;
+        window.location.href = `${API_BASE_URL}${download_url}`;
       } else {
         const result = await response.json();
         console.log("Success response:", result);
@@ -80,16 +83,14 @@ export function DownloadForm() {
 
   const testConnection = async () => {
     try {
-      console.log("Testing connection to:", `${import.meta.env.VITE_API_URL}/network-test`);
-      console.log("VITE_API_URL value:", import.meta.env.VITE_API_URL);
+      console.log("Testing connection to:", `${API_BASE_URL}/network-test`);
       
       // Add timeout to the fetch request
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/network-test`, {
+      const response = await fetch(`${API_BASE_URL}/network-test`, {
         signal: controller.signal,
-        mode: 'cors', // Explicitly set CORS mode
         cache: 'no-cache' // Disable caching
       });
       
@@ -239,57 +240,9 @@ export function DownloadForm() {
         Test Backend Connection
       </button>
       
-      <button
-        type="button"
-        onClick={() => {
-          console.log("Testing direct connection to backend");
-          fetch('http://backend:5000/network-test', {
-            mode: 'cors',
-            cache: 'no-cache'
-          })
-            .then(response => response.json())
-            .then(data => {
-              console.log("Direct test result:", data);
-              toast({
-                title: "Direct Test Success",
-                description: "Backend connection is working with direct URL",
-                duration: 5000,
-              });
-            })
-            .catch(error => {
-              console.error("Direct test error:", error);
-              toast({
-                title: "Direct Test Failed",
-                description: error.message,
-                variant: "destructive",
-              });
-              
-              // Try another direct URL as fallback
-              console.log("Trying fallback URL");
-              return fetch('http://192.168.147.2:5000/network-test', {
-                mode: 'cors', 
-                cache: 'no-cache'
-              });
-            })
-            .then(response => response?.json())
-            .then(data => {
-              if (data) {
-                console.log("Fallback test result:", data);
-                toast({
-                  title: "Fallback Test Success",
-                  description: "Backend connection works with IP address",
-                  duration: 5000,
-                });
-              }
-            })
-            .catch(error => {
-              console.error("Fallback test error:", error);
-            });
-        }}
-        className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/80 h-10 px-4 py-2 w-full mt-4"
-      >
-        Test Direct Connection
-      </button>
+      <div className="text-xs text-gray-500 mt-2">
+        API Base URL: {API_BASE_URL} (Proxied to backend)
+      </div>
     </motion.form>
   );
 }
