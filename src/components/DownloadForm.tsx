@@ -27,18 +27,43 @@ export function DownloadForm() {
     setLoading(true);
 
     try {
-      // Simulated API call - replace with actual implementation
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      
-      toast({
-        title: "Success",
-        description: "Your download has started",
-        duration: 3000,
+      // Make API call to Flask backend
+      const response = await fetch('http://localhost:5000/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: formData.url,
+          format: formData.format || 'mp4',
+          type: formData.downloadType,
+          quality: formData.quality || 'best',
+          direct_download: formData.directDownload,
+        }),
       });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error);
+      }
+
+      if (formData.directDownload) {
+        // For direct downloads, get the download URL and trigger browser download
+        const { download_url } = await response.json();
+        window.location.href = download_url;
+      } else {
+        // For non-direct downloads, show success message with the video info
+        const result = await response.json();
+        toast({
+          title: "Success",
+          description: `Video "${result.title}" is ready for download`,
+          duration: 5000,
+        });
+      }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to start download",
+        description: error instanceof Error ? error.message : "Failed to download video",
         variant: "destructive",
       });
     } finally {
