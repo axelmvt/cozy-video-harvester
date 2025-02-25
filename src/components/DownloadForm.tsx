@@ -43,9 +43,14 @@ export function DownloadForm() {
       console.log("Response status:", response.status);
       
       if (!response.ok) {
-        const error = await response.text();
-        console.error("Error response:", error);
-        throw new Error(error);
+        let errorMessage = 'Unknown error occurred';
+        try {
+          const errorResponse = await response.json();
+          errorMessage = errorResponse.error || errorResponse.message || JSON.stringify(errorResponse);
+        } catch (jsonError) {
+          errorMessage = await response.text();
+        }
+        throw new Error(errorMessage);
       }
 
       if (formData.directDownload) {
@@ -70,6 +75,38 @@ export function DownloadForm() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const testConnection = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ test: "connection" }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Test failed');
+      }
+
+      const result = await response.json();
+      console.log("Test result:", result);
+      toast({
+        title: "Test Success",
+        description: "Backend connection is working",
+        duration: 5000,
+      });
+    } catch (error) {
+      console.error('Test error:', error);
+      toast({
+        title: "Test Failed",
+        description: error instanceof Error ? error.message : "Failed to test connection",
+        variant: "destructive",
+      });
     }
   };
 
@@ -169,6 +206,14 @@ export function DownloadForm() {
             Download
           </>
         )}
+      </button>
+
+      <button
+        type="button"
+        onClick={testConnection}
+        className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 w-full mt-4"
+      >
+        Test Backend Connection
       </button>
     </motion.form>
   );

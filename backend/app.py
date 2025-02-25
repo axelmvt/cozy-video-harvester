@@ -41,7 +41,15 @@ def download_video():
     try:
         print("Received download request with headers:", request.headers)
         print("Received download request with data:", request.json)
-        data = request.json
+        
+        # Validate request content type
+        if not request.is_json:
+            return jsonify({"error": "Request must be JSON"}), 400
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid JSON data"}), 400
+
         url = data.get('url')
         format_type = data.get('format', 'mp4')
         download_type = data.get('type', 'video')
@@ -118,6 +126,15 @@ def serve_file(filename):
         )
     except Exception as e:
         return jsonify({"error": str(e)}), 404
+
+@app.route('/test', methods=['POST'])
+def test_endpoint():
+    try:
+        print("Test request received with headers:", request.headers)
+        print("Test request received with data:", request.json)
+        return jsonify({"status": "success", "message": "Test endpoint works"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     # Add a delay to ensure the server is ready
