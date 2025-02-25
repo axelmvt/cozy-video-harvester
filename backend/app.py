@@ -6,13 +6,17 @@ from flask_cors import CORS
 import yt_dlp
 from pathlib import Path
 import time
+import socket
 
 app = Flask(__name__)
 CORS(app, resources={
     r"/*": {
         "origins": ["*"],  # Allow all origins for debugging
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["*"]  # Allow all headers
+        "allow_headers": ["Content-Type", "Authorization", "Accept"],
+        "expose_headers": ["Content-Type", "X-CSRFToken"],
+        "supports_credentials": True,
+        "max_age": 86400
     }
 })
 
@@ -142,15 +146,37 @@ def ping():
 
 @app.route('/network-test')
 def network_test():
+    # Get information about our environment
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    
+    # Try to resolve the frontend hostname
+    frontend_ip = None
+    try:
+        frontend_ip = socket.gethostbyname('frontend')
+    except socket.gaierror:
+        frontend_ip = "Could not resolve frontend hostname"
+    
     return jsonify({
         "backend_ip": request.remote_addr,
-        "headers": dict(request.headers)
+        "backend_hostname": hostname,
+        "backend_local_ip": local_ip,
+        "frontend_ip_from_backend": frontend_ip,
+        "headers": dict(request.headers),
+        "environment": {
+            "FLASK_ENV": os.environ.get("FLASK_ENV", "Not set"),
+            "FLASK_DEBUG": os.environ.get("FLASK_DEBUG", "Not set")
+        }
     }), 200
 
 @app.before_request
 def log_request_info():
-    app.logger.debug('Headers: %s', request.headers)
-    app.logger.debug('Body: %s', request.get_data())
+    print(f"Request from: {request.remote_addr}")
+    print(f"Headers: {request.headers}")
+    print(f"Method: {request.method}")
+    print(f"Path: {request.path}")
+    if request.data:
+        print(f"Body: {request.get_data()}")
 
 if __name__ == '__main__':
     # Add a delay to ensure the server is ready
