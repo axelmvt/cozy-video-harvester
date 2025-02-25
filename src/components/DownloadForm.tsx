@@ -80,19 +80,10 @@ export function DownloadForm() {
 
   const testConnection = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/test`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ test: "connection" }),
-      });
-
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/ping`);
       if (!response.ok) {
         throw new Error('Test failed');
       }
-
       const result = await response.json();
       console.log("Test result:", result);
       toast({

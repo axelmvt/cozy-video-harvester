@@ -12,7 +12,9 @@ services:
       backend:
         condition: service_healthy
     networks:
-      - app-network
+      app-network:
+        aliases:
+          - frontend
 
   backend:
     build: 
@@ -24,7 +26,9 @@ services:
       - ./backend:/app
       - download_data:/app/downloads
     networks:
-      - app-network
+      app-network:
+        aliases:
+          - backend
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000"]
       interval: 30s
