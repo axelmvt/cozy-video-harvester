@@ -12,6 +12,8 @@ services:
       - VITE_API_URL=http://backend:5000
     depends_on:
       - backend
+    networks:
+      - app-network
 
   backend:
     build: 
@@ -22,6 +24,17 @@ services:
     volumes:
       - ./backend:/app
       - download_data:/app/downloads
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   download_data:
+
+networks:
+  app-network:
+    driver: bridge
