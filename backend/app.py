@@ -1,4 +1,3 @@
-
 import os
 import json
 from datetime import datetime, timedelta
@@ -8,7 +7,13 @@ import yt_dlp
 from pathlib import Path
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://localhost:8080", "http://frontend:8080"],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 # Configure download directory
 DOWNLOAD_DIR = Path("downloads")

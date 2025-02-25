@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Loader2 } from "lucide-react";
@@ -27,18 +26,15 @@ export function DownloadForm() {
     setLoading(true);
 
     try {
-      // Make API call to Flask backend
-      const response = await fetch('http://localhost:5000/download', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/download`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           url: formData.url,
-          format: formData.format || 'mp4',
           type: formData.downloadType,
-          quality: formData.quality || 'best',
-          direct_download: formData.directDownload,
+          directDownload: formData.directDownload
         }),
       });
 
