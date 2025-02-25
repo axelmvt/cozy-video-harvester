@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import yt_dlp
 from pathlib import Path
+import time
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -118,4 +119,6 @@ def serve_file(filename):
         return jsonify({"error": str(e)}), 404
 
 if __name__ == '__main__':
+    # Add a delay to ensure the server is ready
+    time.sleep(5)
     app.run(debug=True, host='0.0.0.0', port=5000)
