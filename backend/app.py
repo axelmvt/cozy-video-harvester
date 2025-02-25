@@ -10,9 +10,9 @@ import time
 app = Flask(__name__)
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:8080", "http://frontend:8080"],
+        "origins": ["*"],  # Allow all origins for debugging
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
+        "allow_headers": ["*"]  # Allow all headers
     }
 })
 
@@ -39,6 +39,7 @@ def get_safe_filename(title):
 @app.route('/download', methods=['POST'])
 def download_video():
     try:
+        print("Received download request with headers:", request.headers)
         print("Received download request with data:", request.json)
         data = request.json
         url = data.get('url')

@@ -26,10 +26,12 @@ export function DownloadForm() {
     setLoading(true);
 
     try {
+      console.log("Making request to:", `${import.meta.env.VITE_API_URL}/download`);
       const response = await fetch(`${import.meta.env.VITE_API_URL}/download`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
           url: formData.url,
@@ -38,18 +40,21 @@ export function DownloadForm() {
         }),
       });
 
+      console.log("Response status:", response.status);
+      
       if (!response.ok) {
         const error = await response.text();
+        console.error("Error response:", error);
         throw new Error(error);
       }
 
       if (formData.directDownload) {
-        // For direct downloads, get the download URL and trigger browser download
         const { download_url } = await response.json();
+        console.log("Direct download URL:", download_url);
         window.location.href = `${import.meta.env.VITE_API_URL}${download_url}`;
       } else {
-        // For non-direct downloads, show success message with the video info
         const result = await response.json();
+        console.log("Success response:", result);
         toast({
           title: "Success",
           description: `Video "${result.title}" is ready for download`,
