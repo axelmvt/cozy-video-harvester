@@ -80,12 +80,12 @@ export function DownloadForm() {
 
   const testConnection = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/ping`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/network-test`);
       if (!response.ok) {
         throw new Error('Test failed');
       }
       const result = await response.json();
-      console.log("Test result:", result);
+      console.log("Network test result:", result);
       toast({
         title: "Test Success",
         description: "Backend connection is working",

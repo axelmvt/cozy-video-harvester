@@ -140,6 +140,18 @@ def test_endpoint():
 def ping():
     return jsonify({"status": "success", "message": "pong"}), 200
 
+@app.route('/network-test')
+def network_test():
+    return jsonify({
+        "backend_ip": request.remote_addr,
+        "headers": dict(request.headers)
+    }), 200
+
+@app.before_request
+def log_request_info():
+    app.logger.debug('Headers: %s', request.headers)
+    app.logger.debug('Body: %s', request.get_data())
+
 if __name__ == '__main__':
     # Add a delay to ensure the server is ready
     time.sleep(5)
