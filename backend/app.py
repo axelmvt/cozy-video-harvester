@@ -38,6 +38,7 @@ def get_safe_filename(title):
 @app.route('/download', methods=['POST'])
 def download_video():
     try:
+        print("Received download request with data:", request.json)
         data = request.json
         url = data.get('url')
         format_type = data.get('format', 'mp4')

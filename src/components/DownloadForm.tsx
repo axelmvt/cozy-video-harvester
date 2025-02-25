@@ -46,7 +46,7 @@ export function DownloadForm() {
       if (formData.directDownload) {
         // For direct downloads, get the download URL and trigger browser download
         const { download_url } = await response.json();
-        window.location.href = `http://localhost:5000${download_url}`;
+        window.location.href = `${import.meta.env.VITE_API_URL}${download_url}`;
       } else {
         // For non-direct downloads, show success message with the video info
         const result = await response.json();
