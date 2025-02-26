@@ -56,13 +56,17 @@ export function DownloadForm() {
         throw new Error(errorMessage);
       }
 
+      const result = await response.json();
+      console.log("Success response:", result);
+
       if (formData.directDownload) {
-        const { download_url } = await response.json();
-        console.log("Direct download URL:", download_url);
-        window.location.href = `${API_BASE_URL}${download_url}`;
+        if (result.download_url) {
+          console.log("Direct download URL:", result.download_url);
+          window.location.href = `${API_BASE_URL}${result.download_url}`;
+        } else {
+          throw new Error("Download URL not found in server response");
+        }
       } else {
-        const result = await response.json();
-        console.log("Success response:", result);
         toast({
           title: "Success",
           description: `Video "${result.title}" is ready for download`,
