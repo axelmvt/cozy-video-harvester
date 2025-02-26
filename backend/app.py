@@ -108,6 +108,7 @@ def download_video():
                     },
                     # Force use of the regular webpage
                     'compat_opts': ['no-youtube-unavailable-videos'],
+                    'verify_ssl': False,  # Additional option to disable SSL verification
                 }
 
                 if quality != 'best' and download_type == 'video':
@@ -158,7 +159,8 @@ def download_video():
                         return jsonify({
                             "title": title,
                             "format": format_type,
-                            "type": download_type
+                            "type": download_type,
+                            "download_url": f"/download-file/{os.path.basename(existing_file)}"
                         })
             except Exception as e:
                 print(f"Error with format {format_string}: {str(e)}")
@@ -269,6 +271,10 @@ def log_request_info():
     print(f"Path: {request.path}")
     if request.data:
         print(f"Body: {request.get_data()}")
+
+@app.route('/download-file/<filename>')
+def download_file(filename):
+    return send_file(f'downloads/{filename}', as_attachment=True)
 
 if __name__ == '__main__':
     # Add a delay to ensure the server is ready
