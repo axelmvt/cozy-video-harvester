@@ -7,6 +7,8 @@ import yt_dlp
 from pathlib import Path
 import time
 import socket
+import sys
+import platform
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -63,11 +65,27 @@ def download_video():
         if not url:
             return jsonify({"error": "URL is required"}), 400
 
-        # Configure yt-dlp options
+        # Configure yt-dlp options with additional bypass options
         ydl_opts = {
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best' if download_type == 'video' else 'bestaudio[ext=mp3]/best',
             'outtmpl': str(DOWNLOAD_DIR / '%(title)s.%(ext)s'),
             'keepvideo': True,
+            # Add additional options to bypass restrictions
+            'nocheckcertificate': True,
+            'ignoreerrors': True,
+            'no_warnings': True,
+            'quiet': False,
+            'verbose': True,
+            'geo_bypass': True,
+            'extractor_retries': 5,
+            'socket_timeout': 30,
+            # Random user agent to avoid detection
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-us,en;q=0.5',
+                'Sec-Fetch-Mode': 'navigate',
+            }
         }
 
         if quality != 'best':
@@ -143,6 +161,22 @@ def test_endpoint():
 @app.route('/ping', methods=['GET'])
 def ping():
     return jsonify({"status": "success", "message": "pong"}), 200
+
+@app.route('/version')
+def version():
+    """Return information about yt-dlp version and system"""
+    try:
+        with yt_dlp.YoutubeDL() as ydl:
+            version_info = ydl.extract_info("https://www.youtube.com/watch?v=jNQXAC9IVRw", download=False, process=False)
+            return jsonify({
+                "yt_dlp_version": yt_dlp.version.__version__,
+                "python_version": sys.version,
+                "platform": platform.platform(),
+                "extractor": version_info.get('extractor', 'Unknown'),
+                "extractor_key": version_info.get('extractor_key', 'Unknown')
+            }), 200
+    except Exception as e:
+        return jsonify({"error": str(e), "yt_dlp_version": yt_dlp.version.__version__}), 500
 
 @app.route('/network-test')
 def network_test():
