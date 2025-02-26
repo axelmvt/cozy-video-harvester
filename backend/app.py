@@ -126,7 +126,6 @@ def download_video():
                     # SSL and verification settings
                     'nocheckcertificate': True,
                     'verify_ssl': False,
-                    'ssl_verify': False,  # Alternative name used in some contexts
                     'check_certificates': False,
                     # Error handling
                     'ignoreerrors': True,
@@ -135,16 +134,16 @@ def download_video():
                     'verbose': True,
                     # Network settings
                     'geo_bypass': True,
-                    'geo_bypass_country': 'US',  # Attempt US-based IP
+                    'geo_bypass_country': 'US',
                     'extractor_retries': 10,
-                    'socket_timeout': 120,     # Increased timeout
+                    'socket_timeout': 120,
                     'force_generic_extractor': False,
                     'check_formats': 'selected',
-                    'cachedir': False,        # Disable cache
-                    'prefer_insecure': True,  # Prefer insecure connections
-                    # Use a more modern user agent from the list
+                    'cachedir': False,
+                    'prefer_insecure': True,
+                    # Use a more modern user agent
                     'http_headers': {
-                        'User-Agent': user_agents[0],  # Use first UA by default
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                         'Accept-Language': 'en-US,en;q=0.5',
                         'Referer': 'https://www.google.com/',
@@ -158,6 +157,12 @@ def download_video():
                     ],
                     # External downloader options
                     'external_downloader_args': ['--insecure', '--no-check-certificate'],
+                    # Add YouTube specific options
+                    'extract_flat': True,
+                    'youtube_include_dash_manifest': False,
+                    'youtube_include_hls_manifest': False,
+                    'youtube_skip_dash_manifest': True,
+                    'youtube_skip_hls_manifest': True,
                 }
 
                 if quality != 'best' and download_type == 'video':
@@ -184,7 +189,10 @@ def download_video():
                             try:
                                 ydl_opts['http_headers']['User-Agent'] = user_agent
                                 print(f"Trying with User-Agent: {user_agent}")
-                                info = ydl.extract_info(url, download=False)
+                                if 'youtube.com' in url or 'youtu.be' in url:
+                                    info = extract_youtube_info(ydl, url)
+                                else:
+                                    info = ydl.extract_info(url, download=False)
                                 if info:
                                     print(f"Successfully extracted info with User-Agent: {user_agent}")
                                     break
@@ -385,6 +393,22 @@ def log_request_info():
 @app.route('/download-file/<filename>')
 def download_file(filename):
     return send_file(f'downloads/{filename}', as_attachment=True)
+
+def extract_youtube_info(ydl, url):
+    """Special handling for YouTube videos"""
+    try:
+        # Try to get info without downloading
+        info = ydl.extract_info(url, download=False)
+        
+        # If we get info but no formats, try alternative methods
+        if info and not info.get('formats'):
+            # Try with different extractors
+            info = ydl.extract_info(url, download=False, process=True)
+            
+        return info
+    except Exception as e:
+        print(f"Error extracting YouTube info: {e}")
+        return None
 
 if __name__ == '__main__':
     # Add a delay to ensure the server is ready
