@@ -65,74 +65,108 @@ def download_video():
         if not url:
             return jsonify({"error": "URL is required"}), 400
 
-        # Configure yt-dlp options with additional bypass options
-        ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best' if download_type == 'video' else 'bestaudio[ext=mp3]/best',
-            'outtmpl': str(DOWNLOAD_DIR / '%(title)s.%(ext)s'),
-            'keepvideo': True,
-            # Add additional options to bypass restrictions
-            'nocheckcertificate': True,
-            'ignoreerrors': True,
-            'no_warnings': True,
-            'quiet': False,
-            'verbose': True,
-            'geo_bypass': True,
-            'extractor_retries': 5,
-            'socket_timeout': 30,
-            # Random user agent to avoid detection
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-us,en;q=0.5',
-                'Sec-Fetch-Mode': 'navigate',
-            }
-        }
-
-        if quality != 'best':
-            ydl_opts['format'] = f'bestvideo[height<={quality}]+bestaudio/best[height<={quality}]'
-
-        if download_type == 'audio':
-            ydl_opts['postprocessors'] = [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }]
+        # Try different format strings based on the video type
+        formats = []
+        if download_type == 'video':
+            formats = [
+                'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                'bestvideo+bestaudio/best',
+                'b'  # Shorthand for best
+            ]
+        else:
+            formats = [
+                'bestaudio[ext=mp3]/bestaudio/best',
+                'ba'  # Shorthand for best audio
+            ]
 
         # Clean up old files
         cleanup_old_files()
 
-        # Download video
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Get video info first
-            info = ydl.extract_info(url, download=False)
-            title = get_safe_filename(info['title'])
-            
-            # Check if file already exists
-            existing_file = None
-            for ext in [format_type, 'mp4', 'mp3']:
-                potential_file = DOWNLOAD_DIR / f"{title}.{ext}"
-                if potential_file.exists():
-                    existing_file = potential_file
-                    break
-            
-            if not existing_file:
-                # Download if file doesn't exist
-                info = ydl.extract_info(url, download=True)
-                title = get_safe_filename(info['title'])
-                ext = 'mp3' if download_type == 'audio' else format_type
-                existing_file = DOWNLOAD_DIR / f"{title}.{ext}"
+        # Try each format until one works
+        for format_string in formats:
+            try:
+                # Configure yt-dlp options with additional bypass options
+                ydl_opts = {
+                    'format': format_string,
+                    'outtmpl': str(DOWNLOAD_DIR / '%(title)s.%(ext)s'),
+                    'keepvideo': True,
+                    # Add additional options to bypass restrictions
+                    'nocheckcertificate': True,
+                    'ignoreerrors': True,
+                    'no_warnings': True,
+                    'quiet': False,
+                    'verbose': True,
+                    'geo_bypass': True,
+                    'extractor_retries': 5,
+                    'socket_timeout': 30,
+                    # Use a more modern user agent
+                    'http_headers': {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                        'Accept-Language': 'en-US,en;q=0.5',
+                        'Sec-Fetch-Mode': 'navigate',
+                    },
+                    # Force use of the regular webpage
+                    'compat_opts': ['no-youtube-unavailable-videos'],
+                }
 
-            if direct_download:
-                return jsonify({
-                    "download_url": f"/download/{existing_file.name}",
-                    "title": title
-                })
-            else:
-                return jsonify({
-                    "title": title,
-                    "format": format_type,
-                    "type": download_type
-                })
+                if quality != 'best' and download_type == 'video':
+                    if quality.isdigit():
+                        ydl_opts['format'] = f'bestvideo[height<={quality}]+bestaudio/best[height<={quality}]'
+                    
+                if download_type == 'audio':
+                    ydl_opts['postprocessors'] = [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'mp3',
+                        'preferredquality': '192',
+                    }]
+
+                # Try to download
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    # Get video info first without downloading
+                    print(f"Trying format: {format_string}")
+                    info = ydl.extract_info(url, download=False)
+                    title = get_safe_filename(info['title'])
+                    
+                    # Check if file already exists
+                    existing_file = None
+                    for ext in [format_type, 'mp4', 'webm', 'mp3']:
+                        potential_file = DOWNLOAD_DIR / f"{title}.{ext}"
+                        if potential_file.exists():
+                            existing_file = potential_file
+                            break
+                    
+                    if not existing_file:
+                        # Download if file doesn't exist
+                        info = ydl.extract_info(url, download=True)
+                        title = get_safe_filename(info['title'])
+                        
+                        # Determine the extension based on the downloaded file
+                        if download_type == 'audio':
+                            ext = 'mp3'
+                        else:
+                            ext = info.get('ext', format_type)
+                            
+                        existing_file = DOWNLOAD_DIR / f"{title}.{ext}"
+
+                    if direct_download:
+                        return jsonify({
+                            "download_url": f"/download/{existing_file.name}",
+                            "title": title
+                        })
+                    else:
+                        return jsonify({
+                            "title": title,
+                            "format": format_type,
+                            "type": download_type
+                        })
+            except Exception as e:
+                print(f"Error with format {format_string}: {str(e)}")
+                last_error = e
+                continue  # Try the next format
+        
+        # If we get here, all formats failed
+        return jsonify({"error": f"Failed to download video with all format options. Last error: {str(last_error)}"}), 500
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -177,6 +211,30 @@ def version():
             }), 200
     except Exception as e:
         return jsonify({"error": str(e), "yt_dlp_version": yt_dlp.version.__version__}), 500
+
+@app.route('/update-ytdlp', methods=['POST'])
+def update_ytdlp():
+    """Update yt-dlp to the latest version"""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["pip", "install", "--upgrade", "yt-dlp"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        # Reload the yt-dlp module to use the updated version
+        import importlib
+        importlib.reload(yt_dlp)
+        return jsonify({
+            "message": "yt-dlp updated successfully",
+            "output": result.stdout,
+            "new_version": yt_dlp.version.__version__
+        }), 200
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": str(e), "output": e.stdout, "error_output": e.stderr}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/network-test')
 def network_test():

@@ -157,6 +157,43 @@ export function DownloadForm() {
     }
   };
 
+  const updateYtDlp = async () => {
+    try {
+      setLoading(true);
+      toast({
+        title: "Updating yt-dlp",
+        description: "This may take a minute...",
+        duration: 5000,
+      });
+      
+      const response = await fetch(`${API_BASE_URL}/update-ytdlp`, {
+        method: 'POST'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log("Update result:", result);
+      
+      toast({
+        title: "Update Successful",
+        description: `yt-dlp updated to version: ${result.new_version}`,
+        duration: 5000,
+      });
+    } catch (error) {
+      console.error('Update error:', error);
+      toast({
+        title: "Update Failed",
+        description: error instanceof Error ? error.message : "Failed to update yt-dlp",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <motion.form
       initial={{ opacity: 0, y: 20 }}
@@ -266,10 +303,29 @@ export function DownloadForm() {
       <button
         type="button"
         onClick={checkVersion}
-        className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 w-full mt-4"
+        className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 w-full mt-2"
       >
         Check yt-dlp Version
       </button>
+      
+      <button
+        type="button"
+        onClick={updateYtDlp}
+        disabled={loading}
+        className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-accent text-accent-foreground hover:bg-accent/80 h-10 px-4 py-2 w-full mt-2"
+      >
+        Update yt-dlp to Latest Version
+      </button>
+      
+      <div className="text-xs text-gray-500 mt-4 p-3 bg-muted rounded">
+        <p className="font-semibold mb-1">Troubleshooting Tips:</p>
+        <ul className="list-disc pl-4 space-y-1">
+          <li>If downloads fail, update yt-dlp to the latest version</li>
+          <li>Try audio-only downloads if video downloads fail</li>
+          <li>Some YouTube videos may have restrictions that prevent downloading</li>
+          <li>Try a different video URL if you continue to get errors</li>
+        </ul>
+      </div>
       
       <div className="text-xs text-gray-500 mt-2">
         API Base URL: {API_BASE_URL} (Proxied to backend)
