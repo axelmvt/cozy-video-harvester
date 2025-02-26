@@ -6,10 +6,24 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     curl \
+    git \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install the latest version of yt-dlp
-RUN pip install --upgrade yt-dlp
+# Update ca-certificates
+RUN update-ca-certificates
+
+# Install the latest development version of yt-dlp from git
+RUN pip uninstall -y yt-dlp || true
+RUN git clone https://github.com/yt-dlp/yt-dlp.git /tmp/yt-dlp \
+    && cd /tmp/yt-dlp \
+    && pip install -e . \
+    && cd / \
+    && rm -rf /tmp/yt-dlp/.git
+
+# Set environment variables to disable SSL verification
+ENV PYTHONHTTPSVERIFY=0
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
 # Install Python dependencies
 COPY requirements.txt .
@@ -20,9 +34,6 @@ COPY . .
 
 # Create downloads directory
 RUN mkdir -p downloads
-
-# Install ca-certificates
-RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
 
 EXPOSE 5000
 

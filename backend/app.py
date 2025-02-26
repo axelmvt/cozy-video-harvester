@@ -9,6 +9,16 @@ import time
 import socket
 import sys
 import platform
+import ssl
+import urllib3
+import requests
+
+# Disable SSL verification globally for Python requests
+ssl._create_default_https_context = ssl._create_unverified_context
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Set environment variable to disable SSL verification
+os.environ['PYTHONHTTPSVERIFY'] = '0'
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -60,7 +70,7 @@ def download_video():
         format_type = data.get('format', 'mp4')
         download_type = data.get('type', 'video')
         quality = data.get('quality', 'best')
-        direct_download = data.get('direct_download', False)
+        direct_download = data.get('directDownload', False)
 
         if not url:
             return jsonify({"error": "URL is required"}), 400
@@ -97,18 +107,24 @@ def download_video():
                     'quiet': False,
                     'verbose': True,
                     'geo_bypass': True,
-                    'extractor_retries': 5,
-                    'socket_timeout': 30,
+                    'extractor_retries': 10,  # Increased retries
+                    'socket_timeout': 60,     # Increased timeout
+                    'verify_ssl': False,
+                    'force_generic_extractor': False,
+                    'check_formats': 'selected',
+                    'cachedir': False,        # Disable cache
+                    'prefer_insecure': True,  # Prefer insecure connections
                     # Use a more modern user agent
                     'http_headers': {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                         'Accept-Language': 'en-US,en;q=0.5',
                         'Sec-Fetch-Mode': 'navigate',
+                        'Referer': 'https://www.google.com/',
                     },
                     # Force use of the regular webpage
-                    'compat_opts': ['no-youtube-unavailable-videos'],
-                    'verify_ssl': False,  # Additional option to disable SSL verification
+                    'compat_opts': ['no-youtube-unavailable-videos', 'no-check-certificates'],
+                    'external_downloader_args': ['--insecure'],
                 }
 
                 if quality != 'best' and download_type == 'video':
@@ -126,8 +142,17 @@ def download_video():
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     # Get video info first without downloading
                     print(f"Trying format: {format_string}")
-                    info = ydl.extract_info(url, download=False)
-                    title = get_safe_filename(info['title'])
+                    try:
+                        info = ydl.extract_info(url, download=False)
+                        
+                        if info is None:
+                            print(f"Failed to get info with format {format_string}")
+                            continue
+                            
+                        title = get_safe_filename(info.get('title', 'Untitled Video'))
+                    except Exception as extract_error:
+                        print(f"Error extracting info: {extract_error}")
+                        continue
                     
                     # Check if file already exists
                     existing_file = None
@@ -139,16 +164,44 @@ def download_video():
                     
                     if not existing_file:
                         # Download if file doesn't exist
-                        info = ydl.extract_info(url, download=True)
-                        title = get_safe_filename(info['title'])
-                        
-                        # Determine the extension based on the downloaded file
-                        if download_type == 'audio':
-                            ext = 'mp3'
-                        else:
-                            ext = info.get('ext', format_type)
+                        try:
+                            info = ydl.extract_info(url, download=True)
                             
-                        existing_file = DOWNLOAD_DIR / f"{title}.{ext}"
+                            if info is None:
+                                print(f"Download failed with format {format_string}")
+                                continue
+                                
+                            title = get_safe_filename(info.get('title', 'Untitled Video'))
+                            
+                            # Determine the extension based on the downloaded file
+                            if download_type == 'audio':
+                                ext = 'mp3'
+                            else:
+                                ext = info.get('ext', format_type)
+                                
+                            existing_file = DOWNLOAD_DIR / f"{title}.{ext}"
+                            
+                            if not existing_file.exists():
+                                print(f"File not found after download: {existing_file}")
+                                
+                                # Look for any file that was recently created
+                                latest_file = None
+                                latest_time = 0
+                                for file in DOWNLOAD_DIR.glob('*'):
+                                    file_time = file.stat().st_mtime
+                                    if file_time > latest_time:
+                                        latest_time = file_time
+                                        latest_file = file
+                                
+                                if latest_file and (time.time() - latest_time) < 60:  # If file was created in the last minute
+                                    existing_file = latest_file
+                                    print(f"Using most recent file instead: {existing_file}")
+                                else:
+                                    continue  # Try the next format
+                            
+                        except Exception as download_error:
+                            print(f"Error during download: {download_error}")
+                            continue
 
                     if direct_download:
                         return jsonify({
