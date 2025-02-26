@@ -3,22 +3,37 @@ import json
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-import yt_dlp
-from pathlib import Path
-import time
-import socket
 import sys
 import platform
-import ssl
-import urllib3
-import requests
+import time
+import socket
+from pathlib import Path
 
-# Disable SSL verification globally for Python requests
+# Disable SSL verification as early as possible
+import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
+
+# Force urllib3 to disable warnings and SSL verification
+import urllib3
+urllib3.disable_warnings()
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Set environment variable to disable SSL verification
+# Force requests to disable SSL verification
+import requests
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+# Set environment variables to disable SSL verification
 os.environ['PYTHONHTTPSVERIFY'] = '0'
+os.environ['CURL_CA_BUNDLE'] = ''
+os.environ['REQUESTS_CA_BUNDLE'] = ''
+os.environ['SSL_CERT_FILE'] = ''
+
+# Now import yt-dlp after all the SSL configurations
+import yt_dlp
+
+# Print yt-dlp version for debugging
+print(f"Using yt-dlp version: {yt_dlp.version.__version__}")
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -95,36 +110,54 @@ def download_video():
         # Try each format until one works
         for format_string in formats:
             try:
+                # Common user agents that work better with modern sites
+                user_agents = [
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+                ]
+                
                 # Configure yt-dlp options with additional bypass options
                 ydl_opts = {
                     'format': format_string,
                     'outtmpl': str(DOWNLOAD_DIR / '%(title)s.%(ext)s'),
                     'keepvideo': True,
-                    # Add additional options to bypass restrictions
+                    # SSL and verification settings
                     'nocheckcertificate': True,
+                    'verify_ssl': False,
+                    'ssl_verify': False,  # Alternative name used in some contexts
+                    'check_certificates': False,
+                    # Error handling
                     'ignoreerrors': True,
                     'no_warnings': True,
                     'quiet': False,
                     'verbose': True,
+                    # Network settings
                     'geo_bypass': True,
-                    'extractor_retries': 10,  # Increased retries
-                    'socket_timeout': 60,     # Increased timeout
-                    'verify_ssl': False,
+                    'geo_bypass_country': 'US',  # Attempt US-based IP
+                    'extractor_retries': 10,
+                    'socket_timeout': 120,     # Increased timeout
                     'force_generic_extractor': False,
                     'check_formats': 'selected',
                     'cachedir': False,        # Disable cache
                     'prefer_insecure': True,  # Prefer insecure connections
-                    # Use a more modern user agent
+                    # Use a more modern user agent from the list
                     'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                        'User-Agent': user_agents[0],  # Use first UA by default
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                         'Accept-Language': 'en-US,en;q=0.5',
-                        'Sec-Fetch-Mode': 'navigate',
                         'Referer': 'https://www.google.com/',
+                        'Origin': 'https://www.google.com',
                     },
-                    # Force use of the regular webpage
-                    'compat_opts': ['no-youtube-unavailable-videos', 'no-check-certificates'],
-                    'external_downloader_args': ['--insecure'],
+                    # Compatibility options
+                    'compat_opts': [
+                        'no-youtube-unavailable-videos',
+                        'no-check-certificates',
+                        'no-verify-urls',
+                    ],
+                    # External downloader options
+                    'external_downloader_args': ['--insecure', '--no-check-certificate'],
                 }
 
                 if quality != 'best' and download_type == 'video':
@@ -143,9 +176,26 @@ def download_video():
                     # Get video info first without downloading
                     print(f"Trying format: {format_string}")
                     try:
-                        info = ydl.extract_info(url, download=False)
+                        # Try with multiple user agents if needed
+                        info = None
+                        extract_error = None
+                        
+                        for user_agent in user_agents:
+                            try:
+                                ydl_opts['http_headers']['User-Agent'] = user_agent
+                                print(f"Trying with User-Agent: {user_agent}")
+                                info = ydl.extract_info(url, download=False)
+                                if info:
+                                    print(f"Successfully extracted info with User-Agent: {user_agent}")
+                                    break
+                            except Exception as e:
+                                extract_error = e
+                                print(f"Failed to extract with User-Agent {user_agent}: {e}")
+                                continue
                         
                         if info is None:
+                            if extract_error:
+                                raise extract_error
                             print(f"Failed to get info with format {format_string}")
                             continue
                             
@@ -203,10 +253,17 @@ def download_video():
                             print(f"Error during download: {download_error}")
                             continue
 
+                    # Make sure the file path is properly formatted for the response
+                    relative_path = os.path.basename(str(existing_file))
+                    
                     if direct_download:
+                        download_path = f"/download-file/{relative_path}"
+                        print(f"Returning direct download path: {download_path}")
                         return jsonify({
-                            "download_url": f"/download/{existing_file.name}",
-                            "title": title
+                            "title": title,
+                            "format": format_type,
+                            "type": download_type,
+                            "download_url": download_path
                         })
                     else:
                         return jsonify({
