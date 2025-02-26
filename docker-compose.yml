@@ -22,7 +22,7 @@ services:
       - "5000:5000"
     volumes:
       - ./backend:/app
-      - download_data:/app/downloads
+      - ~/Downloads:/app/downloads
     networks:
       app-network:
         aliases:
